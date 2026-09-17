@@ -27,13 +27,19 @@ Narrative in English; keep product and stream names as-is.
 - **Rule:** Messengers are **information sources** to collect, store, and index (FTS + later vectors). They are **not** a control channel for the agent (no ChatOps, no “command the assistant from Telegram/WhatsApp/Teams”).
 - **Source:** user, 2026-09-17.
 
+## 2026-09-17 — GitHub
+
+- **Scope:** hosting.
+- **Rule:** Canonical remote is **https://github.com/askred-dot-ru/mymind** (**public**). Local dump `z/mymind/`. Do not nest MyMind in `askred-dot-ru/morda` or `law-bot`.
+- **Source:** published 2026-09-17.
+
 ## 2026-09-17 — v1 contour (locked)
 
 - **Scope:** first delivery.
 - **Rule:**
-  - Web app (FastAPI + React), PostgreSQL, own login/password (later table `user → Пользователь1С`).
+  - Web app (FastAPI + React), PostgreSQL, own login/password.
   - `pgvector` in schema now; embedding **provider and job later**.
-  - 1C out of contour except a stub bridge (`execute` → 501).
+  - No 1C in v1 (no tables, routes, env). Later hypothetical: outbound HTTP from MyMind.
   - Dev: Docker Compose (API, IMAP worker, Postgres+pgvector). Config **only via env** so the same app can later run on the host without Docker (`DATABASE_URL`, `ATTACHMENTS_DIR`, bind host/port).
   - Mail: Yandex app-password, Gmail OAuth in browser; full local copy; IDLE; unified folder tree (per-mailbox split optional); delete → Trash + `\Deleted`, EXPUNGE on empty trash; thread reading pane on the right; attachments on disk.
 - **Source:** user decisions, 2026-09-17.
