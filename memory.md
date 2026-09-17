@@ -1,13 +1,19 @@
-# Memory — MyMind
+# Memory — Oh!MyMind
 
 Working project memory for AI agents. Eligibility vs `1c-templates-mcp` (`remember` / `recall`) — portfolio `AGENTS.md → Project memory`.
 
 Narrative in English; keep product and stream names as-is.
 
+## 2026-09-17 — Product name
+
+- **Scope:** branding.
+- **Rule:** Human product name is **Oh!MyMind**. Where `!` is illegal (DNS, some identifiers) write **OhiMyMind**. GitHub **https://github.com/askred-dot-ru/OhiMyMind**. Local path `z/ohimymind/`. Do not spell the product as MyMind / MyMinde in UI or docs.
+- **Source:** user, 2026-09-17.
+
 ## 2026-09-17 — Product: knowledge streams, not a mail client
 
-- **Scope:** MyMind (`z/mymind/`). Do **not** implement this product inside 1C extension `Почта` (`z0/z0_C/`).
-- **Rule:** MyMind is a system for **classification, storage, and distribution of knowledge streams**. Mail is only stream #1 — the first and simplest stream, not the whole product. Do not design or name the system as a mail client.
+- **Scope:** Oh!MyMind (`z/ohimymind/`). Do **not** implement this product inside 1C extension `Почта` (`z0/z0_C/`).
+- **Rule:** Oh!MyMind is a system for **classification, storage, and distribution of knowledge streams**. Mail is only stream #1 — the first and simplest stream, not the whole product. Do not design or name the system as a mail client.
 - **Why:** v1 mail UI is an ingest surface; later streams (messengers, LLM sessions) must fit the same envelope.
 - **Source:** user, 2026-09-17.
 
@@ -30,7 +36,7 @@ Narrative in English; keep product and stream names as-is.
 ## 2026-09-17 — GitHub
 
 - **Scope:** hosting.
-- **Rule:** Canonical remote is **https://github.com/askred-dot-ru/mymind** (**public**). Local dump `z/mymind/`. Do not nest MyMind in `askred-dot-ru/morda` or `law-bot`.
+- **Rule:** Canonical remote is **https://github.com/askred-dot-ru/OhiMyMind** (**public**). Local dump `z/ohimymind/`. Do not nest Oh!MyMind in `askred-dot-ru/morda` or `law-bot`.
 - **Source:** published 2026-09-17.
 
 ## 2026-09-17 — v1 contour (locked)
@@ -39,7 +45,7 @@ Narrative in English; keep product and stream names as-is.
 - **Rule:**
   - Web app (FastAPI + React), PostgreSQL, own login/password.
   - `pgvector` in schema now; embedding **provider and job later**.
-  - No 1C in v1 (no tables, routes, env). Later hypothetical: outbound HTTP from MyMind.
+  - No 1C in v1 (no tables, routes, env). Later hypothetical: outbound HTTP from Oh!MyMind.
   - Dev: Docker Compose (API, IMAP worker, Postgres+pgvector). Config **only via env** so the same app can later run on the host without Docker (`DATABASE_URL`, `ATTACHMENTS_DIR`, bind host/port).
   - Mail: Yandex app-password, Gmail OAuth in browser; full local copy; IDLE; unified folder tree (per-mailbox split optional); delete → Trash + `\Deleted`, EXPUNGE on empty trash; thread reading pane on the right; attachments on disk.
 - **Source:** user decisions, 2026-09-17.

@@ -1,9 +1,5 @@
 #!/bin/sh
+# One-shot leftover. Canonical repo is already https://github.com/askred-dot-ru/OhiMyMind
 set -e
-cd /Users/red/ai/z/mymind
-git add README.md memory.md .gitignore
-git status --porcelain
-git commit -m "Initial MyMind project memory and README."
-gh repo create mymind --private --source=. --remote=origin --push
+cd /Users/red/ai/z/ohimymind
 git remote -v
-gh repo view --web --json url -q .url

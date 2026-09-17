@@ -1,0 +1,66 @@
+name: ohimymind
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ohimymind}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ohimymind}
+      POSTGRES_DB: ${POSTGRES_DB:-ohimymind}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build: .
+    command: ["python", "-m", "app.entrypoint"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ohimymind}:${POSTGRES_PASSWORD:-ohimymind}@db:5432/${POSTGRES_DB:-ohimymind}
+      ATTACHMENTS_DIR: /data/attachments
+      HTTP_HOST: 0.0.0.0
+      HTTP_PORT: ${HTTP_PORT:-8798}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://127.0.0.1:8798}
+      APP_MASTER_KEY: ${APP_MASTER_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
+      SESSION_SECRET: ${SESSION_SECRET:-ohimymind-local-dev-session-secret-change-me}
+      OHIMYMIND_BOOTSTRAP_ADMIN: ${OHIMYMIND_BOOTSTRAP_ADMIN:-admin}
+      OHIMYMIND_BOOTSTRAP_PASSWORD: ${OHIMYMIND_BOOTSTRAP_PASSWORD:-adminadmin}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+    ports:
+      - "${HTTP_PORT:-8798}:${HTTP_PORT:-8798}"
+    volumes:
+      - attachments:/data/attachments
+    depends_on:
+      db:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: ["python", "-m", "worker.main"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ohimymind}:${POSTGRES_PASSWORD:-ohimymind}@db:5432/${POSTGRES_DB:-ohimymind}
+      ATTACHMENTS_DIR: /data/attachments
+      HTTP_HOST: 0.0.0.0
+      HTTP_PORT: ${HTTP_PORT:-8798}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://127.0.0.1:8798}
+      APP_MASTER_KEY: ${APP_MASTER_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
+      SESSION_SECRET: ${SESSION_SECRET:-ohimymind-local-dev-session-secret-change-me}
+      OHIMYMIND_BOOTSTRAP_ADMIN: ${OHIMYMIND_BOOTSTRAP_ADMIN:-admin}
+      OHIMYMIND_BOOTSTRAP_PASSWORD: ${OHIMYMIND_BOOTSTRAP_PASSWORD:-adminadmin}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+    volumes:
+      - attachments:/data/attachments
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+    name: ohimymind_pgdata
+  attachments:
+    name: ohimymind_attachments

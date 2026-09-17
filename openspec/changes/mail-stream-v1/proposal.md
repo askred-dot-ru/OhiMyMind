@@ -2,7 +2,7 @@
 
 ## Why
 
-MyMind is a **standalone** product: classification, storage, and distribution of knowledge streams. Mail is stream #1 — the simplest ingest, not the product. It has **no relationship to 1C** in this change. Later we may attach 1C by **outbound HTTP** from MyMind; URL and actions are unknown and are not designed here. Today: users, PostgreSQL copy of mail, IMAP IDLE, web UI with threads, envelope for later streams (messengers, LLM sessions).
+Oh!MyMind is a **standalone** product: classification, storage, and distribution of knowledge streams. Mail is stream #1 — the simplest ingest, not the product. It has **no relationship to 1C** in this change. Later we may attach 1C by **outbound HTTP** from Oh!MyMind; URL and actions are unknown and are not designed here. Today: users, PostgreSQL copy of mail, IMAP IDLE, web UI with threads, envelope for later streams (messengers, LLM sessions).
 
 ## What changes
 
@@ -15,7 +15,7 @@ MyMind is a **standalone** product: classification, storage, and distribution of
 
 | In scope | Out of scope |
 |---|---|
-| Repo `z/mymind/`, GitHub `askred-dot-ru/mymind` | Any 1C configuration, CFE `Почта`, HTTP to 1C |
+| Repo `z/ohimymind/`, GitHub `askred-dot-ru/OhiMyMind` | Any 1C configuration, CFE `Почта`, HTTP to 1C |
 | Mail ingest/index/UI as above | Telegram / WhatsApp / Teams ingest (kind reserved) |
 | LLM session kind reserved in DB | LLM chat UI, embeddings job, vector search UI |
 | Env-ready run without Docker hostnames in code | Shipping a native installer in this change |
@@ -47,7 +47,7 @@ MyMind is a **standalone** product: classification, storage, and distribution of
 - Gmail IMAP requires a Google Cloud OAuth client in env; without it Gmail connect is disabled (explicit UI), Yandex still works.
 - Full copy + HTML + attachments will grow disk; no retention in v1.
 - IDLE drops on some providers; worker must reconnect with backoff.
-- UNC path `//Mac/ai/z/mymind` needs `safe.directory` for git on Windows; unrelated to runtime.
+- UNC path `//Mac/ai/z/ohimymind` needs `safe.directory` for git on Windows; unrelated to runtime.
 
 ## Context sources
 

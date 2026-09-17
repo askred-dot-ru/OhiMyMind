@@ -1,6 +1,6 @@
-# OpenSpec — MyMind
+# OpenSpec — Oh!MyMind
 
-Spec-driven workspace for **MyMind** (`https://github.com/askred-dot-ru/mymind`).
+Spec-driven workspace for **Oh!MyMind** (`https://github.com/askred-dot-ru/OhiMyMind`). Technical slug without `!`: **OhiMyMind**. Local path `z/ohimymind/`.
 
 Not the 1C portfolio OpenSpec at `z/openspec/` (УчетЧасов / Почта CFE). Do not mix.
 

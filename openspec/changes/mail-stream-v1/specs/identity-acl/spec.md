@@ -4,7 +4,7 @@
 
 ### Requirement: Local users
 
-Users MUST authenticate with login and password stored in PostgreSQL (argon2id). The first admin MUST be created from `MYMIND_BOOTSTRAP_ADMIN` and `MYMIND_BOOTSTRAP_PASSWORD` when no admin row exists. Further users MAY self-register as role `user`.
+Users MUST authenticate with login and password stored in PostgreSQL (argon2id). The first admin MUST be created from `OHIMYMIND_BOOTSTRAP_ADMIN` and `OHIMYMIND_BOOTSTRAP_PASSWORD` when no admin row exists. Further users MAY self-register as role `user`.
 
 #### Scenario: Bootstrap admin
 - GIVEN an empty `users` table and bootstrap env set
@@ -21,7 +21,7 @@ Users MUST authenticate with login and password stored in PostgreSQL (argon2id).
 #### Scenario: Login
 - GIVEN a registered user
 - WHEN POST `/api/v1/auth/login` with correct password
-- THEN the response sets httponly cookie `mymind_session`
+- THEN the response sets httponly cookie `ohimymind_session`
 - AND GET `/api/v1/me` returns login and role
 
 ### Requirement: Ownership ACL

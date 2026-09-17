@@ -1,6 +1,6 @@
 project:
-  name: MyMind
-  description: "Classification, storage and distribution of knowledge streams. Mail is stream #1."
+  name: Oh!MyMind
+  description: "Classification, storage and distribution of knowledge streams. Mail is stream #1. Slug without '!': OhiMyMind."
 
 context:
   tech_stack:
@@ -15,5 +15,5 @@ context:
     - Messengers are ingest sources, not agent control
   constraints:
     - Standalone product in v1: no 1C tables, routes, or env
-    - Later hypothetical: outbound HTTP from MyMind (URL unknown)
+    - Later hypothetical: outbound HTTP from Oh!MyMind (URL unknown)
     - Config only via environment variables

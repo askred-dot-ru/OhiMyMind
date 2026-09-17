@@ -7,7 +7,7 @@
 The application MUST read `DATABASE_URL`, `ATTACHMENTS_DIR`, `HTTP_HOST`, `HTTP_PORT`, `PUBLIC_BASE_URL`, `APP_MASTER_KEY`, `SESSION_SECRET`, bootstrap admin vars, and optional `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` from the environment. Source MUST NOT contain Docker Compose DNS names except as example values in `.env.example`. v1 MUST NOT define `ONEC_*` or other 1C connection settings.
 
 #### Scenario: Host-shaped URLs
-- GIVEN `DATABASE_URL=postgresql://mymind:mymind@127.0.0.1:5432/mymind`
+- GIVEN `DATABASE_URL=postgresql://ohimymind:ohimymind@127.0.0.1:5432/ohimymind`
 - WHEN API and worker start outside Compose
 - THEN they use that URL unchanged
 

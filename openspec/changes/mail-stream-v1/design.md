@@ -46,7 +46,7 @@ Browser talks **only** to FastAPI (same origin). Worker never serves HTTP. No 1C
 
 ### D1. Placement
 
-Code and OpenSpec live in `z/mymind/` / `askred-dot-ru/mymind`. MyMind is a separate product, not a 1C configuration or CFE.
+Code and OpenSpec live in `z/ohimymind/` / `askred-dot-ru/OhiMyMind`. Oh!MyMind is a separate product, not a 1C configuration or CFE. Slug without `!`: OhiMyMind.
 
 ### D2. Standalone IMAP in Python
 
@@ -62,20 +62,20 @@ Three services: `api`, `worker`, `db` (image `pgvector/pgvector:pg16`). No Docke
 
 ### D5. Classification two-layer, UI one-layer in v1
 
-Tables `topics`, `item_topics` exist. v1 UI uses only native mail folders/labels. MyMind topics have no screens. Rationale: product is a classifier, but mail already has folders; overlay UI waits for a second stream.
+Tables `topics`, `item_topics` exist. v1 UI uses only native mail folders/labels. Oh!MyMind topics have no screens. Rationale: product is a classifier, but mail already has folders; overlay UI waits for a second stream.
 
 ### D6. Distribution stub (internal)
 
 Table `distribution_routes` (`item_id`, `channel`, `payload_json`, `status=stub`). No dispatcher in v1. No 1C channel, no `user_1c_*` tables, no `/onec` routes, no `ONEC_*` env.
 
-Later (separate change): outbound HTTP from MyMind to an external system (hypothetically 1C). Base URL and actions are unknown; do not invent them now.
+Later (separate change): outbound HTTP from Oh!MyMind to an external system (hypothetically 1C). Base URL and actions are unknown; do not invent them now.
 
 ### D7. Identity
 
 - Table `users`: login (citext unique), `password_hash` argon2id, `role` ∈ {`user`,`admin`}, `is_active`.
-- Bootstrap: if no admin exists, `MYMIND_BOOTSTRAP_ADMIN` + `MYMIND_BOOTSTRAP_PASSWORD` creates one at API start (logged once, not echoed).
+- Bootstrap: if no admin exists, `OHIMYMIND_BOOTSTRAP_ADMIN` + `OHIMYMIND_BOOTSTRAP_PASSWORD` creates one at API start (logged once, not echoed).
 - After that, **self-registration** `POST /api/v1/auth/register` creates `role=user`.
-- Session: signed httponly cookie `mymind_session`, `SameSite=Lax`, secret `SESSION_SECRET`.
+- Session: signed httponly cookie `ohimymind_session`, `SameSite=Lax`, secret `SESSION_SECRET`.
 - ACL: `user` — rows where `owner_user_id = current`. `admin` — all rows. Impersonation is read-only query `?as_user_id=` only for admin.
 
 ### D8. Secrets
