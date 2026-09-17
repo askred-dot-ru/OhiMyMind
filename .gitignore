@@ -1,0 +1,22 @@
+# MyMind — secrets, deps, runtime data
+
+.env
+.env.*
+!.env.example
+
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+node_modules/
+dist/
+
+data/
+attachments/
+*.log
+
+.DS_Store
+Thumbs.db
