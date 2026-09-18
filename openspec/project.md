@@ -7,5 +7,6 @@
 - **Local path:** `z/ohimymind/`
 - **Product:** classify, store, and distribute **knowledge streams**
 - **v1 stream:** mail (IMAP/SMTP). Inbox: important / unimportant by From-domain; threads by RFC identifiers only. Messengers and LLM sessions are reserved kinds only.
+- **Active change:** `semantic-index-v1` — local embeddings (LM Studio), `knowledge_chunks`, hybrid search in mail UI. Chat/DeepSeek not in this change.
 - **1C:** none in v1. Later hypothetical: outbound HTTP from Oh!MyMind (URL/actions unknown).
 - **Memory:** `z/ohimymind/memory.md`

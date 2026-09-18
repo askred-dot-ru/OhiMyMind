@@ -49,8 +49,14 @@ Narrative in English; keep product and stream names as-is.
 - **Scope:** first delivery.
 - **Rule:**
   - Web app (FastAPI + React), PostgreSQL, own login/password.
-  - `pgvector` in schema now; embedding **provider and job later**.
+  - `pgvector` in schema; embedding job is change `semantic-index-v1` (local LM Studio, default `text-embedding-multilingual-e5-small`, hybrid search). Chat/DeepSeek is a later change.
   - No 1C in v1 (no tables, routes, env). Later hypothetical: outbound HTTP from Oh!MyMind.
   - Dev: Docker Compose (API, IMAP worker, Postgres+pgvector). Config **only via env** so the same app can later run on the host without Docker (`DATABASE_URL`, `ATTACHMENTS_DIR`, bind host/port).
   - Mail: Yandex app-password, Gmail OAuth in browser; full local copy; IDLE; unified folder tree (per-mailbox split optional); delete → Trash + `\Deleted`, EXPUNGE on empty trash; thread reading pane on the right; attachments on disk.
 - **Source:** user decisions, 2026-09-17.
+
+## 2026-09-18 — Semantic index (not chat)
+
+- **Scope:** Oh!MyMind change `semantic-index-v1`.
+- **Rule:** Local OpenAI-compatible embeddings at `LM_STUDIO_URL` (LM Studio). Default model `text-embedding-multilingual-e5-small` (same id as cfsmcp2). Admin Settings card can change `model_id`; that full-reindexes. Do not index `spam`/`trash`. Hybrid RRF in the mail omnibar this change. LLM chat / DeepSeek — next change. Retrieval vectors on `knowledge_chunks`, not `knowledge_items.embedding`. Do not vendor cfsmcp2 (AGPL); pgvector only.
+- **Source:** user, 2026-09-18.

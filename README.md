@@ -10,7 +10,7 @@
 
 v1 не связан с 1С; позже возможен исходящий HTTP.
 
-Канон для агентов: [`memory.md`](memory.md). OpenSpec: [`openspec/changes/mail-stream-v1/`](openspec/changes/mail-stream-v1/).
+Канон для агентов: [`memory.md`](memory.md). Текущая спека: [`openspec/specs/`](openspec/specs/). Активный change: [`openspec/changes/semantic-index-v1/`](openspec/changes/semantic-index-v1/). Архив v1 почты: [`openspec/changes/archive/2026-09-18-mail-stream-v1/`](openspec/changes/archive/2026-09-18-mail-stream-v1/).
 
 ## Запуск (v1)
 
