@@ -50,7 +50,7 @@
 ## 7. Verify
 
 - [x] 7.1 `docker compose up --build`: `/health`, `/`, register+login
-- [ ] 7.2 Yandex or Gmail: unified Inbox, thread pane, delete→Trash
+- [x] 7.2 Yandex or Gmail: unified Inbox, thread pane, delete→Trash
 - [x] 7.3 Confirm no 1C env/routes in the running image
 
 ## Context sources
