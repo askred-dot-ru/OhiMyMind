@@ -11,6 +11,7 @@
 - [x] 2.1 Alembic: `CREATE EXTENSION vector`; tables `users`, `knowledge_items`, `topics`, `item_topics`, `distribution_routes`, `mail_accounts`, `mail_account_secrets`, `mail_folder_maps`, `mail_threads`, `mail_messages`, `mail_attachments`, `mail_outbox`
 - [x] 2.2 `knowledge_items.embedding vector(1536)` nullable; `stream_kind` check includes mail/messenger/llm_session
 - [x] 2.3 No `user_1c_*` tables
+- [x] 2.4 Alembic `002_attachment_cid`; `003_unimportant_domains` (`users.unimportant_domains` JSONB)
 
 ## 3. Auth and ACL
 
@@ -39,6 +40,12 @@
 - [x] 6.2 Account settings (Yandex form, Gmail button, unified toggle, default From)
 - [x] 6.3 Folder tree, thread list (5s poll), right-pane thread, DOMPurify HTML
 - [x] 6.4 Compose / reply / forward / delete / empty trash / archive / search / flags
+- [x] 6.5 Identifier-only threading + `rebuild_all_threads` on API start (no subject/participant glue)
+- [x] 6.6 Inbox important / unimportant (`users.unimportant_domains`), settings CRUD, dock, Очистить
+- [x] 6.7 Tile RMB menu; Shift range + batch archive/delete/execute/importance; Reply/Forward single
+- [x] 6.8 Per-letter pane actions; temporary Выполнить → `DONE_RECIPIENT` then archive thread
+- [x] 6.9 Attachment gallery + file tiles; `?download=1`
+- [x] 6.10 HTML iframe: no inner scrollbars, height to content, frame `--bg-2`
 
 ## 7. Verify
 
@@ -48,4 +55,4 @@
 
 ## Context sources
 
-`recall` 585–588, 590. Specs in this change. No 1C MCP for implementation tasks.
+`recall` 585–588, 590, 610–616. Specs in this change. No 1C MCP for implementation tasks.

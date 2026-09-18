@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import MailAccount, MailMessage, MailOutbox
-from app.store_mail import upsert_parsed_message
+from app.store_mail import drop_inbox_copies, upsert_parsed_message
 from worker.imap_io import build_outgoing, smtp_connect
 
 log = logging.getLogger("ohimymind.actions")
@@ -28,7 +28,7 @@ def apply_pending(client: IMAPClient, db: Session, account: MailAccount, maps: d
     for msg in rows:
         action = msg.pending_imap
         try:
-            _run_action(client, maps, account, msg, action)
+            _run_action(client, db, maps, account, msg, action)
             if action == "append_draft" and msg.uid is None:
                 pass
             msg.pending_imap = None
@@ -47,6 +47,7 @@ def apply_pending(client: IMAPClient, db: Session, account: MailAccount, maps: d
 
 def _run_action(
     client: IMAPClient,
+    db: Session,
     maps: dict[str, str],
     account: MailAccount,
     msg: MailMessage,
@@ -95,6 +96,7 @@ def _run_action(
             except Exception:
                 log.info("copy to trash failed account_id=%s uid=%s", account.id, msg.uid)
         client.add_flags(uid, [DELETED])
+        drop_inbox_copies(db, account.id, msg.message_id_header, keep_id=msg.id)
         return
     if action == "archive":
         if account.provider == "gmail":
@@ -102,6 +104,12 @@ def _run_action(
                 client.remove_gmail_labels(uid, ["\\Inbox"])
             except Exception:
                 log.info("gmail archive labels failed account_id=%s uid=%s", account.id, msg.uid)
+                for all_mail in ("[Gmail]/All Mail", "[Gmail]/Вся почта", "[Google Mail]/All Mail"):
+                    try:
+                        client.move(uid, all_mail)
+                        break
+                    except Exception:
+                        continue
         else:
             archive = maps.get("archive")
             if archive:
@@ -110,6 +118,7 @@ def _run_action(
                 except Exception:
                     client.copy(uid, archive)
                     client.add_flags(uid, [DELETED])
+        drop_inbox_copies(db, account.id, msg.message_id_header, keep_id=msg.id)
         return
     if action == "set_seen":
         client.add_flags(uid, [SEEN])

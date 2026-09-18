@@ -10,6 +10,8 @@ function formatDetail(data: unknown, fallback: string): string {
     if (detail === "invalid_credentials") return "неверный логин или пароль";
     if (detail === "gmail_oauth_not_configured") return "Gmail OAuth не настроен";
     if (detail === "imap_login_failed") return "не удалось войти в IMAP";
+    if (detail === "domain_required") return "укажите домен";
+    if (detail === "inbox_only") return "очистка только для входящих";
     return detail;
   }
   if (Array.isArray(detail)) {
@@ -85,8 +87,33 @@ export const api = {
   read: (id: string, body: { seen?: boolean; flagged?: boolean; message_id?: string }) =>
     request(`/api/v1/mail/threads/${id}/read`, { method: "POST", body: JSON.stringify(body) }),
   trash: (id: string) => request(`/api/v1/mail/messages/${id}/trash`, { method: "POST" }),
+  /** Archive every message in the same thread as this id. */
   archive: (id: string) => request(`/api/v1/mail/messages/${id}/archive`, { method: "POST" }),
+  /** TEMPORARY: forward this message to robr@askred.ru, then archive the thread. */
+  done: (id: string) => request(`/api/v1/mail/messages/${id}/done`, { method: "POST" }),
   emptyTrash: () => request("/api/v1/mail/folders/trash/empty", { method: "POST" }),
+  clearUnimportantInbox: (folder: string) => {
+    const params = new URLSearchParams({ folder });
+    return request<{ ok: boolean; trashed: number }>(
+      `/api/v1/mail/inbox/unimportant/clear?${params.toString()}`,
+      { method: "POST" },
+    );
+  },
+  unimportantDomains: () => request<{ domains: string[] }>("/api/v1/mail/unimportant-domains"),
+  addUnimportantDomain: (domain: string) =>
+    request<{ domains: string[] }>("/api/v1/mail/unimportant-domains", {
+      method: "POST",
+      body: JSON.stringify({ domain }),
+    }),
+  removeUnimportantDomain: (domain: string) =>
+    request<{ domains: string[] }>(`/api/v1/mail/unimportant-domains/${encodeURIComponent(domain)}`, {
+      method: "DELETE",
+    }),
+  replaceUnimportantDomains: (domains: string[]) =>
+    request<{ domains: string[] }>("/api/v1/mail/unimportant-domains", {
+      method: "PUT",
+      body: JSON.stringify({ domains }),
+    }),
   compose: (body: {
     account_id: string;
     to: string[];

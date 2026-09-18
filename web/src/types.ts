@@ -34,6 +34,8 @@ export type ThreadHead = {
   account_id: string;
   folder_canonical: string;
   provider: string;
+  message_count: number;
+  latest_message_id?: string;
 };
 
 export type AttachmentMeta = {

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="112" fill="#121417"/>
+  <g transform="translate(46 28) scale(1.05)">
+    <defs>
+      <linearGradient id="m" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#8E939D"/>
+        <stop offset="35%" stop-color="#D4D7DF"/>
+        <stop offset="65%" stop-color="#5A5E67"/>
+        <stop offset="100%" stop-color="#2C3036"/>
+      </linearGradient>
+    </defs>
+    <g transform="translate(-40 -70)">
+      <path d="M 250, 100 C 350, 100 400, 200 350, 300 C 300, 400 150, 420 100, 320 C 50, 220 150, 100 250, 100 Z" stroke="url(#m)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M 200, 150 C 100, 150 80, 280 160, 360 C 240, 440 380, 360 360, 220 C 340, 100 250, 120 200, 150 Z" stroke="url(#m)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+      <polygon points="230,85 270,105 230,125" fill="url(#m)" transform="rotate(-25 250 105)"/>
+      <circle cx="250" cy="100" r="12" fill="url(#m)" stroke="#FFFFFF" stroke-width="3"/>
+      <circle cx="350" cy="300" r="10" fill="url(#m)" stroke="#FFFFFF" stroke-width="3"/>
+      <circle cx="100" cy="320" r="10" fill="url(#m)" stroke="#FFFFFF" stroke-width="3"/>
+      <circle cx="160" cy="360" r="14" fill="url(#m)" stroke="#FFFFFF" stroke-width="3"/>
+      <circle cx="360" cy="220" r="12" fill="url(#m)" stroke="#FFFFFF" stroke-width="3"/>
+      <circle cx="200" cy="150" r="10" fill="url(#m)" stroke="#FFFFFF" stroke-width="3"/>
+    </g>
+  </g>
+</svg>

@@ -9,7 +9,7 @@ Oh!MyMind is a **standalone** product: classification, storage, and distribution
 1. **Runtime:** Docker Compose with three processes — API (FastAPI + React static), IMAP/SMTP worker, PostgreSQL + `pgvector`. All endpoints and paths via env so the same app can later leave Docker.
 2. **Identity:** users in Postgres (login/password). Role `user` sees only own mail; role `admin` can read others. No 1C user mapping.
 3. **Knowledge envelope:** `knowledge_items.stream_kind ∈ {mail, messenger, llm_session}`; v1 writes only `mail`. Topics and distribution-route tables exist; v1 UI does not drive them.
-4. **Mail stream:** Gmail (OAuth in browser) + Yandex (app password). Full local copy. Canonical folders Inbox/Sent/Drafts/Trash/Archive/Spam + user folders. Unified tree across a user's accounts by default; an account can opt out. Threads in the right pane. Delete = Trash + `\Deleted`; EXPUNGE only on empty-trash. Attachments on disk.
+4. **Mail stream:** Gmail (OAuth in browser) + Yandex (app password). Full local copy. Canonical folders Inbox/Sent/Drafts/Trash/Archive/Spam + user folders. Unified tree across a user's accounts by default; an account can opt out. Threads in the right pane **by Message-ID / In-Reply-To / References only** (no subject glue). Delete = Trash + `\Deleted`; EXPUNGE only on empty-trash. Attachments on disk; UI gallery + file tiles. Inbox split important / unimportant by From-domain, dock, clear-unimportant. Tile RMB menu; Shift range applies one menu action to N heads. Temporary Execute = forward to `robr@askred.ru` then archive thread.
 
 ## Scope
 
@@ -34,7 +34,8 @@ Oh!MyMind is a **standalone** product: classification, storage, and distribution
 ## Success criteria
 
 - `docker compose up` yields a login page; a user can connect Yandex (app password) and/or Gmail (OAuth) and see a unified Inbox.
-- Selecting any message shows the whole thread on the right.
+- Selecting any thread head shows the identifier-linked thread on the right (same subject alone does not join).
+- Inbox lists important then unimportant; Shift+click + one RMB action archives/deletes/executes the range; Reply/Forward stay single.
 - New mail arrives without refresh polling longer than IDLE latency + one API poll interval (≤ 5 s).
 - Delete moves to Trash on server and locally; emptying Trash EXPUNGEs.
 - Archive removes from Inbox per Gmail label / Yandex Archive folder map.
@@ -51,4 +52,4 @@ Oh!MyMind is a **standalone** product: classification, storage, and distribution
 
 ## Context sources
 
-Verified via MCP: `recall` 585–588, 590. Standalone product; 1C IMAP/HTTP unused. `templatesearch` — no fitting template. Graph/code skipped.
+Verified via MCP: `recall` 585–588, 590, 610–616. Standalone product; 1C IMAP/HTTP unused. `templatesearch` — no fitting template. Graph/code skipped.

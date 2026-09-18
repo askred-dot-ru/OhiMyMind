@@ -9,33 +9,24 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import MailAccount, MailMessage
-from app.store_mail import upsert_parsed_message
+from app.store_mail import parked_uids, purge_parked_from_inbox, upsert_parsed_message
 
 log = logging.getLogger("ohimymind.sync")
 
+INBOX_FETCH_CAP = 100
+OTHER_FETCH_CAP = 40
 
-def sync_folder(
-    client: IMAPClient,
-    db: Session,
-    account: MailAccount,
-    canonical: str,
-    imap_name: str,
-) -> None:
+
+def _search_uids(client: IMAPClient, criteria: list) -> list[int]:
     try:
-        client.select_folder(imap_name, readonly=True)
+        return [int(u) for u in client.search(criteria)]
     except Exception:
-        log.info("select failed account_id=%s folder=%s", account.id, canonical)
-        return
-    try:
-        uids = client.search(["ALL"])
-    except Exception:
-        log.exception("search failed account_id=%s folder=%s", account.id, canonical)
-        return
-    uids = [int(u) for u in uids]
-    state = dict(account.sync_state or {})
-    folder_state = dict(state.get(canonical) or {})
-    last_uid = int(folder_state.get("last_uid") or 0)
-    existing_uids = set(
+        log.exception("search %s failed", criteria)
+        return []
+
+
+def _existing_uids(db: Session, account: MailAccount, canonical: str) -> set[int]:
+    return set(
         db.scalars(
             select(MailMessage.uid).where(
                 MailMessage.account_id == account.id,
@@ -44,28 +35,74 @@ def sync_folder(
             )
         )
     )
-    missing = [u for u in uids if u not in existing_uids]
-    new_only = [u for u in missing if u > last_uid] or missing
-    cid_uids = [
-        int(u)
-        for u in db.scalars(
-            select(MailMessage.uid).where(
-                MailMessage.account_id == account.id,
-                MailMessage.folder_canonical == canonical,
-                MailMessage.uid.is_not(None),
-                MailMessage.body_html.ilike("%cid:%"),
-            )
+
+
+def sync_folder(
+    client: IMAPClient,
+    db: Session,
+    account: MailAccount,
+    canonical: str,
+    imap_name: str,
+    fetch_limit: int | None = None,
+) -> None:
+    try:
+        sel = client.select_folder(imap_name, readonly=True)
+    except Exception:
+        log.info("select failed account_id=%s folder=%s", account.id, canonical)
+        return
+    uidnext = int(sel.get(b"UIDNEXT") or sel.get("UIDNEXT") or 0)
+    state = dict(account.sync_state or {})
+    folder_state = dict(state.get(canonical) or {})
+    last_uid = int(folder_state.get("last_uid") or 0)
+    existing = _existing_uids(db, account, canonical)
+    cap = fetch_limit if fetch_limit is not None else (INBOX_FETCH_CAP if canonical == "inbox" else OTHER_FETCH_CAP)
+
+    to_fetch: list[int] = []
+    if last_uid > 0:
+        newer = [u for u in _search_uids(client, [f"{last_uid + 1}:*"]) if u > last_uid]
+        to_fetch.extend(u for u in newer if u not in existing)
+        if newer:
+            last_uid = max(last_uid, max(newer))
+    elif canonical != "inbox":
+        to_fetch.extend(u for u in _search_uids(client, ["ALL"]) if u not in existing)
+
+    if canonical == "inbox":
+        unseen = _search_uids(client, ["UNSEEN"])
+        to_fetch.extend(u for u in unseen if u not in existing)
+        if uidnext:
+            window_start = max(1, uidnext - 400)
+            window = _search_uids(client, [f"{window_start}:*"])
+            to_fetch.extend(u for u in window if u not in existing)
+        n = purge_parked_from_inbox(db, account.id)
+        if n:
+            log.info("dropped parked inbox copies n=%s account_id=%s", n, account.id)
+            db.commit()
+        skipped = parked_uids(db, account.id)
+        to_fetch = [u for u in to_fetch if u not in skipped]
+
+    seen: set[int] = set()
+    ordered: list[int] = []
+    for uid in sorted(to_fetch, reverse=True):
+        if uid in seen:
+            continue
+        seen.add(uid)
+        ordered.append(uid)
+    ordered = ordered[:cap]
+    if ordered:
+        log.info(
+            "fetch folder=%s account_id=%s taking=%s max_uid=%s",
+            canonical,
+            account.id,
+            len(ordered),
+            max(ordered),
         )
-        if u is not None
-    ]
-    to_fetch = list(dict.fromkeys([*new_only, *cid_uids]))
-    if to_fetch:
-        _fetch_bodies(client, db, account, canonical, to_fetch)
-    stale = [u for u in uids if u in existing_uids]
-    if stale:
-        _refresh_flags(client, db, account, canonical, stale[-400:])
-    if uids:
-        folder_state["last_uid"] = max(uids)
+        _fetch_bodies(client, db, account, canonical, ordered)
+    if last_uid:
+        folder_state["last_uid"] = last_uid
+        state[canonical] = folder_state
+        account.sync_state = state
+    elif ordered:
+        folder_state["last_uid"] = max(ordered)
         state[canonical] = folder_state
         account.sync_state = state
 
@@ -102,10 +139,14 @@ def _fetch_bodies(
                     raw_flags=flags,
                 )
                 db.commit()
-            except Exception:
-                log.exception("parse/store failed account_id=%s uid=%s", account.id, uid)
+            except Exception as exc:
+                log.warning(
+                    "parse/store failed account_id=%s uid=%s err=%s",
+                    account.id,
+                    uid,
+                    type(exc).__name__,
+                )
                 db.rollback()
-        db.commit()
 
 
 def _refresh_flags(

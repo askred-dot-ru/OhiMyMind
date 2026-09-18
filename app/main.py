@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 from app.bootstrap import bootstrap_admin, startup
+from app.threads import rebuild_all_threads
 from app.brand import PRODUCT_NAME
 from app.config import settings
 from app.db import SessionLocal
@@ -24,6 +25,7 @@ async def lifespan(_app: FastAPI):
     db: Session = SessionLocal()
     try:
         bootstrap_admin(db)
+        rebuild_all_threads(db)
         db.commit()
     except Exception:
         db.rollback()

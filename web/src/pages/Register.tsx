@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
+import { BrandLockup } from "../Logo";
 
 export default function Register() {
   const nav = useNavigate();
@@ -22,6 +23,7 @@ export default function Register() {
   return (
     <div className="auth">
       <form className="card" onSubmit={onSubmit}>
+        <BrandLockup />
         <h1>Регистрация</h1>
         <p className="muted">После регистрации войдите отдельно — сессия не создаётся автоматически.</p>
         <input placeholder="Логин" value={login} onChange={(e) => setLogin(e.target.value)} autoComplete="username" />

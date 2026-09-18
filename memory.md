@@ -39,7 +39,12 @@ Narrative in English; keep product and stream names as-is.
 - **Rule:** Canonical remote is **https://github.com/askred-dot-ru/OhiMyMind** (**public**). Local dump `z/ohimymind/`. Do not nest Oh!MyMind in `askred-dot-ru/morda` or `law-bot`.
 - **Source:** published 2026-09-17.
 
-## 2026-09-17 — v1 contour (locked)
+## 2026-09-17 — Temporary «Выполнено»
+
+- **Scope:** mail toolbar.
+- **Rule:** Button **Выполнено** next to Archive. Hardcoded forward to `robr@askred.ru` (`app/done_action.py`, `DONE_RECIPIENT`), then archive. No env, no UI settings. Temporary until a real distribution route exists.
+- **Source:** user, 2026-09-17.
+
 
 - **Scope:** first delivery.
 - **Rule:**

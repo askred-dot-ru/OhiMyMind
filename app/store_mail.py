@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import html as html_std
 import logging
 import re
 import uuid
@@ -19,11 +20,90 @@ from app.threads import find_or_create_thread, normalize_message_id
 log = logging.getLogger("ohimymind.store")
 
 _UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
+_PARKED_FOLDERS = ("archive", "trash")
+
+
+def drop_inbox_copies(
+    db: Session,
+    account_id: uuid.UUID,
+    message_id: str,
+    *,
+    keep_id: uuid.UUID | None = None,
+) -> int:
+    """Remove Inbox rows for a Message-ID that already lives in archive/trash."""
+    mid = (message_id or "").strip()
+    if not mid:
+        return 0
+    stmt = select(MailMessage).where(
+        MailMessage.account_id == account_id,
+        MailMessage.message_id_header == mid,
+        MailMessage.folder_canonical == "inbox",
+    )
+    if keep_id is not None:
+        stmt = stmt.where(MailMessage.id != keep_id)
+    rows = list(db.scalars(stmt))
+    removed = 0
+    for row in rows:
+        item_id = row.knowledge_item_id
+        db.delete(row)
+        db.flush()
+        item = db.get(KnowledgeItem, item_id)
+        if item is not None:
+            db.delete(item)
+        removed += 1
+    return removed
+
+
+def purge_parked_from_inbox(db: Session, account_id: uuid.UUID) -> int:
+    parked_ids = select(MailMessage.message_id_header).where(
+        MailMessage.account_id == account_id,
+        MailMessage.folder_canonical.in_(_PARKED_FOLDERS),
+        MailMessage.message_id_header != "",
+    )
+    rows = list(
+        db.scalars(
+            select(MailMessage).where(
+                MailMessage.account_id == account_id,
+                MailMessage.folder_canonical == "inbox",
+                MailMessage.message_id_header.in_(parked_ids),
+            )
+        )
+    )
+    removed = 0
+    for row in rows:
+        item_id = row.knowledge_item_id
+        db.delete(row)
+        db.flush()
+        item = db.get(KnowledgeItem, item_id)
+        if item is not None:
+            db.delete(item)
+        removed += 1
+    return removed
+
+
+def parked_uids(db: Session, account_id: uuid.UUID) -> set[int]:
+    return {
+        int(uid)
+        for uid in db.scalars(
+            select(MailMessage.uid).where(
+                MailMessage.account_id == account_id,
+                MailMessage.folder_canonical.in_(_PARKED_FOLDERS),
+                MailMessage.uid.is_not(None),
+            )
+        )
+        if uid is not None
+    }
+
+
+def scrub_text(value: str | None) -> str:
+    if not value:
+        return ""
+    return value.replace("\x00", "")
 
 
 def safe_filename(name: str) -> str:
     base = Path(name or "attachment").name
-    cleaned = _UNSAFE.sub("_", base).strip("._") or "attachment"
+    cleaned = _UNSAFE.sub("_", scrub_text(base)).strip("._") or "attachment"
     return cleaned[:180]
 
 
@@ -34,9 +114,9 @@ def decode_header_value(msg: Message, header: str) -> str:
     try:
         from email.header import decode_header, make_header
 
-        return str(make_header(decode_header(str(raw))))
+        return scrub_text(str(make_header(decode_header(str(raw)))))
     except Exception:
-        return str(raw)
+        return scrub_text(str(raw))
 
 
 def _addresses(msg: Message, header: str) -> list[str]:
@@ -44,10 +124,16 @@ def _addresses(msg: Message, header: str) -> list[str]:
     result = []
     for name, addr in pairs:
         if addr:
-            result.append(addr)
+            result.append(scrub_text(addr))
         elif name:
-            result.append(name)
+            result.append(scrub_text(name))
     return result
+
+
+def collapse_preview(text: str | None) -> str:
+    value = html_std.unescape(text or "")
+    value = re.sub(r"[\u200b-\u200d\ufeff]", "", value)
+    return re.sub(r"\s+", " ", value).strip()
 
 
 def html_to_text(html: str) -> str:
@@ -55,7 +141,7 @@ def html_to_text(html: str) -> str:
     text = re.sub(r"(?i)<br\s*/?>", "\n", text)
     text = re.sub(r"(?i)</p>", "\n", text)
     text = re.sub(r"<[^>]+>", " ", text)
-    return re.sub(r"\s+", " ", text).strip()
+    return collapse_preview(text)
 
 
 def parse_payload(msg: Message) -> tuple[str, str, list[tuple[str, str, bytes, str]]]:
@@ -92,9 +178,9 @@ def parse_payload(msg: Message) -> tuple[str, str, list[tuple[str, str, bytes, s
         except Exception:
             text = payload.decode("utf-8", errors="replace")
         if content_type == "text/html" and not body_html:
-            body_html = text
+            body_html = scrub_text(text)
         elif content_type == "text/plain" and not body_text:
-            body_text = text
+            body_text = scrub_text(text)
 
     walk(msg)
     if body_html and not body_text:
@@ -122,6 +208,8 @@ def message_sent_at(msg: Message) -> datetime:
             dt = parsedate_to_datetime(raw)
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)
+            if dt.year < 1990 or dt.year > 2100:
+                return datetime.now(timezone.utc)
             return dt
         except Exception:
             pass
@@ -175,9 +263,27 @@ def upsert_parsed_message(
         existing = db.scalar(
             select(MailMessage).where(
                 MailMessage.account_id == account.id,
+                MailMessage.folder_canonical == folder_canonical,
                 MailMessage.message_id_header == message_id,
             )
         )
+
+    if folder_canonical == "inbox" and message_id:
+        parked = db.scalar(
+            select(MailMessage)
+            .where(
+                MailMessage.account_id == account.id,
+                MailMessage.message_id_header == message_id,
+                MailMessage.folder_canonical.in_(_PARKED_FOLDERS),
+            )
+            .limit(1)
+        )
+        if parked is not None:
+            drop_inbox_copies(db, account.id, message_id)
+            return parked
+
+    if folder_canonical in _PARKED_FOLDERS and message_id:
+        drop_inbox_copies(db, account.id, message_id, keep_id=existing.id if existing else None)
 
     participants = [from_addr, *to_addrs, *cc_addrs]
     thread = find_or_create_thread(
@@ -218,15 +324,15 @@ def upsert_parsed_message(
         item.updated_at = datetime.now(timezone.utc)
         item.embedding = None
 
-    existing.message_id_header = message_id
-    existing.in_reply_to = in_reply_to
-    existing.references_header = references_header
-    existing.subject = subject
-    existing.from_addr = from_addr
-    existing.to_json = to_addrs
-    existing.cc_json = cc_addrs
-    existing.body_text = body_text
-    existing.body_html = body_html
+    existing.message_id_header = scrub_text(message_id)
+    existing.in_reply_to = scrub_text(in_reply_to)
+    existing.references_header = scrub_text(references_header)
+    existing.subject = scrub_text(subject)
+    existing.from_addr = scrub_text(from_addr)
+    existing.to_json = [scrub_text(a) for a in to_addrs]
+    existing.cc_json = [scrub_text(a) for a in cc_addrs]
+    existing.body_text = scrub_text(body_text)
+    existing.body_html = scrub_text(body_html)
     existing.flags = flags
     existing.sent_at = sent_at
     existing.pending_imap = None
@@ -283,3 +389,25 @@ def _store_attachments(
             )
         )
     message.sync_error = "attachment_write_failed" if errors else None
+
+
+def park_message(db: Session, msg: MailMessage, folder: str) -> bool:
+    if msg.folder_canonical == folder:
+        return False
+    source = msg.folder_canonical
+    msg.folder_canonical = folder
+    msg.pending_imap = f"{folder}:{source}"
+    drop_inbox_copies(db, msg.account_id, msg.message_id_header, keep_id=msg.id)
+    return True
+
+
+def park_thread(db: Session, thread_id: uuid.UUID, folder: str, owner_user_id: uuid.UUID) -> int:
+    rows = list(db.scalars(select(MailMessage).where(MailMessage.thread_id == thread_id)))
+    n = 0
+    for msg in rows:
+        account = db.get(MailAccount, msg.account_id)
+        if account is None or account.owner_user_id != owner_user_id:
+            continue
+        if park_message(db, msg, folder):
+            n += 1
+    return n

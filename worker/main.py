@@ -13,6 +13,7 @@ from app.bootstrap import startup
 from app.crypto import decrypt_secret
 from app.db import SessionLocal
 from app.models import MailAccount, MailAccountSecret
+from app.providers import CANONICAL_ORDER, should_skip
 from worker.actions import apply_pending, process_outbox
 from worker.folders import refresh_folder_maps
 from worker.imap_io import imap_connect
@@ -41,15 +42,17 @@ def _account_loop(account_id: str) -> None:
                 continue
             secret = decrypt_secret(bytes(secret_row.blob))
             client = imap_connect(account, secret)
+            log.info("imap connected email=%s", account.email)
             maps = refresh_folder_maps(client, db, account)
             db.commit()
+            log.info("folder maps n=%s email=%s", len(maps), account.email)
             apply_pending(client, db, account, maps)
             process_outbox(client, db, account, secret, maps)
             db.commit()
             inbox = maps.get("inbox", "INBOX")
             sync_folder(client, db, account, "inbox", inbox)
             db.commit()
-            last_sweep = 0.0
+            last_sweep = time.time()
             delay = 5.0
             _delays[account_id] = delay
             while not _stop.is_set():
@@ -63,13 +66,18 @@ def _account_loop(account_id: str) -> None:
                 apply_pending(client, db, account, maps)
                 process_outbox(client, db, account, secret, maps)
                 db.commit()
+                sync_folder(client, db, account, "inbox", maps.get("inbox", "INBOX"))
+                db.commit()
                 now = time.time()
                 if now - last_sweep >= 60:
                     for canonical, imap_name in list(maps.items()):
                         if canonical == "inbox":
                             continue
-                        sync_folder(client, db, account, canonical, imap_name)
-                    last_sweep = now
+                        if should_skip(imap_name):
+                            continue
+                        limit = 80 if canonical in CANONICAL_ORDER else 20
+                        sync_folder(client, db, account, canonical, imap_name, fetch_limit=limit)
+                    last_sweep = time.time()
                     db.commit()
                 caps = []
                 try:
@@ -97,6 +105,10 @@ def _account_loop(account_id: str) -> None:
                     break
         except Exception:
             log.exception("account loop error account_id=%s", account_id)
+            try:
+                db.rollback()
+            except Exception:
+                pass
             delay = min(max(delay, 5.0) * 2, 60.0)
             _delays[account_id] = delay
             _stop.wait(delay)

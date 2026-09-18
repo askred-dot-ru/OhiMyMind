@@ -76,6 +76,8 @@ class ThreadHead(BaseModel):
     account_id: uuid.UUID
     folder_canonical: str
     provider: str = ""
+    message_count: int = 1
+    latest_message_id: uuid.UUID | None = None
 
 
 class AttachmentMeta(BaseModel):
@@ -116,6 +118,18 @@ class ComposeIn(BaseModel):
     in_reply_to: uuid.UUID | None = None
     forward_of: uuid.UUID | None = None
     draft: bool = False
+
+
+class DomainIn(BaseModel):
+    domain: str = Field(min_length=1, max_length=255)
+
+
+class DomainsIn(BaseModel):
+    domains: list[str] = Field(default_factory=list)
+
+
+class DomainsOut(BaseModel):
+    domains: list[str]
 
 
 class ThreadFlagsIn(BaseModel):

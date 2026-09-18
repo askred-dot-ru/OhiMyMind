@@ -111,7 +111,7 @@ Delete in UI: copy/move to trash folder + `\Deleted` on the source; list hides i
 
 ### D11. Threads
 
-`mail_threads.id`. Link by RFC `Message-ID` / `In-Reply-To` / `References`. Fallback: normalized subject (strip Re:/Fwd:) + participants if no headers. UI: left list is thread heads (latest message time); right pane is chronological bodies of that thread. Clicking any member still opens the same thread.
+`mail_threads.id`. Link **only** by RFC `Message-ID` / `In-Reply-To` / `References` (recursive connected component; merge threads that share an id). **No** fallback by normalized subject or participants (`subject_normalized` / `participants` on the thread row are display/cache only). API startup runs `rebuild_all_threads` to undo older subject-glue. UI: left list is thread heads (latest message time); right pane is chronological bodies of that thread. Archive parks the whole identifier thread; a new inbox reply with matching ids resurfaces that chain only.
 
 ### D12. Copy and search
 
@@ -145,7 +145,10 @@ Prefix `/api/v1`. JSON. 401 without session except register/login/oauth callback
 | POST | /mail/messages/{id}/archive | |
 | POST | /mail/folders/trash/empty | EXPUNGE |
 | POST | /mail/messages | compose/reply/forward (`in_reply_to` optional) |
-| GET | /mail/attachments/{id} | file |
+| GET | /mail/attachments/{id} | file; `?download=1` → Content-Disposition attachment + filename |
+| GET/PUT/POST | /mail/unimportant-domains | owner; DELETE `/{domain}` |
+| POST | /mail/inbox/unimportant/clear | trash all inbox mail from unimportant From-domains |
+| POST | /mail/messages/{id}/done | TEMPORARY: SMTP forward invoked letter to `DONE_RECIPIENT`, then archive thread |
 | GET | /health | anon |
 
 React is served by API from `web/dist` on `/`. Vite dev proxy is optional for local; Compose builds the SPA into the API image.
@@ -162,6 +165,26 @@ JSON logs to stdout. Do not log passwords, tokens, raw message bodies. Message i
 
 No collectors, no bot tokens, no ChatOps. Enum values exist only so the next change does not rename `stream_kind`.
 
+### D18. Inbox important / unimportant
+
+`users.unimportant_domains` JSONB string array (Alembic `003`). Exact From-domain, case-insensitive. Inbox UI: section **Важные** then **Не важные**, each with search + domain tabs. Dock + raise/lower when unimportant heads exist. **Очистить** → confirm → `POST .../inbox/unimportant/clear`. CRUD also on the settings page.
+
+### D19. Tile menu and Shift range
+
+RMB on a tile: Reply / Forward / Delete / Archive / Execute / importance. Latest message by `sent_at` for the action. Shift+click: inclusive range in displayed order (important visible + unimportant visible, or the non-inbox list). No open on Shift. RMB on unselected → selection = that tile; RMB on selected → keep multi. Batch: archive, delete (one confirm for N), execute, importance (unique domains). Reply/Forward: menu tile only. CSS `.thread.picked` ≠ `.thread.active`.
+
+### D20. Attachment presentation
+
+CID stays in HTML. Raster gallery in the body (not SVG; not > 8 MiB). Other files: wrapping tile row; inline GET; download `?download=1`.
+
+### D21. HTML iframe
+
+Iframe `scrolling=no`, height = content + 8px, inner overflow/scrollbars hidden, frame background `--bg-2` so Windows/dark theme does not paint a light gutter beside pane buttons.
+
+### D22. Execute (temporary)
+
+`DONE_RECIPIENT = robr@askred.ru` in `app/done_action.py`. Not env, not settings. Forward invoked letter, then `park_thread(..., archive)`. Replace later with a real distribution route.
+
 ## Risks
 
 - Gmail OAuth redirect must equal `PUBLIC_BASE_URL + /api/v1/mail/accounts/gmail/callback`.
@@ -174,4 +197,4 @@ None. Env `GOOGLE_OAUTH_*` empty is a documented disable path (D8), not an apply
 
 ## Context sources
 
-Verified via MCP: `recall` 585–588, 590 (standalone product; no 1C in v1; later HTTP unknown). `templatesearch`: no matching template for FastAPI/IMAP. Graph/code MCP skipped (not 1C sources). Platform `ИнтернетПочта` not used (D2).
+Verified via MCP: `recall` 585–588, 590, 610–616. Code: `app/threads.py`, `app/routers/mail.py`, `web/src/pages/Mail.tsx`, `MsgAttachments.tsx`, `EmailHtml.tsx`, Alembic `003`. `templatesearch`: no FastAPI/IMAP template. Graph/code MCP skipped (not 1C). Platform `ИнтернетПочта` not used (D2).

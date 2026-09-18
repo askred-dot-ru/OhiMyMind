@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.models import MailAccount, MailFolderMap
 from app.providers import (
     CANONICAL_ORDER,
+    is_gmail_system_folder,
     match_canonical,
     normalize_user_canonical,
     should_skip,
@@ -47,6 +48,9 @@ def refresh_folder_maps(client: IMAPClient, db: Session, account: MailAccount) -
         if canonical is None:
             canonical = normalize_user_canonical(name)
         if canonical in mapping and canonical in CANONICAL_ORDER:
+            prev = mapping[canonical]
+            if is_gmail_system_folder(name) and not is_gmail_system_folder(prev):
+                mapping[canonical] = name
             continue
         mapping[canonical] = name
 
@@ -66,5 +70,10 @@ def refresh_folder_maps(client: IMAPClient, db: Session, account: MailAccount) -
             account.folder_maps.append(row)
         else:
             row.imap_name = imap_name
+    for row in list(account.folder_maps):
+        if row.canonical in mapping and not should_skip(row.imap_name):
+            continue
+        db.delete(row)
     db.flush()
+    db.expire(account, ["folder_maps"])
     return {m.canonical: m.imap_name for m in account.folder_maps}

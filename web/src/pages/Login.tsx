@@ -1,7 +1,8 @@
 import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
-import { PRODUCT_NAME } from "../brand";
+import { BrandLockup } from "../Logo";
+import { ThemeToggle } from "../ThemeToggle";
 
 export default function Login() {
   const nav = useNavigate();
@@ -23,8 +24,11 @@ export default function Login() {
   return (
     <div className="auth">
       <form className="card" onSubmit={onSubmit}>
-        <h1>{PRODUCT_NAME}</h1>
-        <p className="muted">Потоки знаний. Почта — поток №1.</p>
+        <div className="auth-brand">
+          <BrandLockup large />
+          <ThemeToggle />
+        </div>
+        <p className="muted">Хаотичные потоки — в извлекаемую базу знаний. Почта сейчас поток №1.</p>
         <input placeholder="Логин" value={login} onChange={(e) => setLogin(e.target.value)} autoComplete="username" />
         <input
           placeholder="Пароль"

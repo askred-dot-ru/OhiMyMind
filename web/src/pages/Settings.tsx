@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
+import { AppHeader } from "../AppHeader";
 import type { Account } from "../types";
 
 function gmailRedirectUris(): string[] {
@@ -18,13 +19,17 @@ function gmailRedirectUris(): string[] {
 
 export default function Settings() {
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [domains, setDomains] = useState<string[]>([]);
+  const [domainDraft, setDomainDraft] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
   async function load() {
-    setAccounts(await api.accounts());
+    const [rows, data] = await Promise.all([api.accounts(), api.unimportantDomains()]);
+    setAccounts(rows);
+    setDomains(data.domains);
   }
 
   useEffect(() => {
@@ -68,11 +73,29 @@ export default function Settings() {
     await load();
   }
 
+  async function addDomain(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    try {
+      const data = await api.addUnimportantDomain(domainDraft);
+      setDomains(data.domains);
+      setDomainDraft("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "не удалось добавить домен");
+    }
+  }
+
+  async function removeDomain(domain: string) {
+    const data = await api.removeUnimportantDomain(domain);
+    setDomains(data.domains);
+  }
+
   return (
-    <div className="settings">
-      <p>
-        <Link to="/">← к потоку почты</Link>
-      </p>
+    <div className="settings-page">
+      <AppHeader>
+        <Link to="/">К потоку</Link>
+      </AppHeader>
+      <div className="settings">
       <h1>Ящики</h1>
       {notice ? <div className="muted">{notice}</div> : null}
       {error ? <div className="error">{error}</div> : null}
@@ -104,6 +127,34 @@ export default function Settings() {
         </button>
       </form>
       <div className="card" style={{ width: "100%" }}>
+        <h2>Не важные домены</h2>
+        <p className="muted">Письма с этих From-доменов во входящих попадают во второй раздел списка.</p>
+        {domains.length ? (
+          <ul className="domain-edit-list">
+            {domains.map((domain) => (
+              <li key={domain}>
+                <span>@{domain}</span>
+                <button type="button" onClick={() => void removeDomain(domain)}>
+                  Убрать
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted">Список пуст</p>
+        )}
+        <form className="domain-edit-form" onSubmit={addDomain}>
+          <input
+            placeholder="ozon.ru"
+            value={domainDraft}
+            onChange={(e) => setDomainDraft(e.target.value)}
+          />
+          <button className="primary" type="submit">
+            Добавить
+          </button>
+        </form>
+      </div>
+      <div className="card" style={{ width: "100%" }}>
         <h2>Gmail (OAuth)</h2>
         <p className="muted">
           Клиент — <strong>Web application</strong>. Consent screen: статус <strong>Testing</strong>, не Publish.
@@ -120,6 +171,7 @@ export default function Settings() {
         <button className="primary" type="button" onClick={gmail}>
           Подключить Gmail
         </button>
+      </div>
       </div>
     </div>
   );

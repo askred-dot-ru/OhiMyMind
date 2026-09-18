@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.config import settings
 from app.crypto import encrypt_secret
@@ -24,11 +25,15 @@ from app.models import (
     User,
 )
 from app.providers import CANONICAL_ORDER, PROVIDER_DEFAULTS, display_name
+from app.mail_domains import merge_domains, normalize_sender_domain
 from app.schemas import (
     AccountOut,
     AccountPatchIn,
     AttachmentMeta,
     ComposeIn,
+    DomainIn,
+    DomainsIn,
+    DomainsOut,
     FolderNode,
     FolderTree,
     MessageOut,
@@ -38,8 +43,9 @@ from app.schemas import (
     YandexAccountIn,
 )
 from app.security import dump_oauth_state, load_oauth_state
-from app.store_mail import html_to_text, rewrite_cids
+from app.store_mail import collapse_preview, html_to_text, park_message, park_thread, rewrite_cids
 from app.threads import normalize_message_id
+from app.done_action import DONE_RECIPIENT, build_done_html, done_subject
 
 router = APIRouter()
 
@@ -237,6 +243,68 @@ def patch_account(
     return _account_out(account)
 
 
+def _stored_domains(user: User) -> list[str]:
+    return merge_domains(list(user.unimportant_domains or []))
+
+
+def _save_domains(db: Session, user: User, domains: list[str]) -> list[str]:
+    cleaned = merge_domains(domains)
+    user.unimportant_domains = cleaned
+    flag_modified(user, "unimportant_domains")
+    db.commit()
+    db.refresh(user)
+    return _stored_domains(user)
+
+
+@router.get("/mail/unimportant-domains", response_model=DomainsOut)
+def list_unimportant_domains(user: User = Depends(current_user), db: Session = Depends(get_db)) -> DomainsOut:
+    row = db.get(User, user.id)
+    if row is None:
+        raise HTTPException(status_code=401, detail="unauthorized")
+    return DomainsOut(domains=_stored_domains(row))
+
+
+@router.put("/mail/unimportant-domains", response_model=DomainsOut)
+def replace_unimportant_domains(
+    payload: DomainsIn,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> DomainsOut:
+    row = db.get(User, user.id)
+    if row is None:
+        raise HTTPException(status_code=401, detail="unauthorized")
+    return DomainsOut(domains=_save_domains(db, row, payload.domains))
+
+
+@router.post("/mail/unimportant-domains", response_model=DomainsOut)
+def add_unimportant_domain(
+    payload: DomainIn,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> DomainsOut:
+    domain = normalize_sender_domain(payload.domain)
+    if not domain:
+        raise HTTPException(status_code=400, detail="domain_required")
+    row = db.get(User, user.id)
+    if row is None:
+        raise HTTPException(status_code=401, detail="unauthorized")
+    return DomainsOut(domains=_save_domains(db, row, [*_stored_domains(row), domain]))
+
+
+@router.delete("/mail/unimportant-domains/{domain}", response_model=DomainsOut)
+def remove_unimportant_domain(
+    domain: str,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> DomainsOut:
+    needle = normalize_sender_domain(domain)
+    row = db.get(User, user.id)
+    if row is None:
+        raise HTTPException(status_code=401, detail="unauthorized")
+    kept = [item for item in _stored_domains(row) if item != needle]
+    return DomainsOut(domains=_save_domains(db, row, kept))
+
+
 @router.get("/mail/folders", response_model=list[FolderTree])
 def list_folders(
     user: User = Depends(current_user),
@@ -311,6 +379,17 @@ def _thread_heads(
         .limit(150)
     )
     threads = list(db.scalars(stmt))
+    thread_ids = [thread.id for thread in threads]
+    count_map: dict[uuid.UUID, int] = {}
+    if thread_ids:
+        count_map = {
+            tid: int(n)
+            for tid, n in db.execute(
+                select(MailMessage.thread_id, func.count(MailMessage.id))
+                .where(MailMessage.thread_id.in_(thread_ids))
+                .group_by(MailMessage.thread_id)
+            )
+        }
     heads: list[ThreadHead] = []
     for thread in threads:
         msg_stmt = (
@@ -326,7 +405,7 @@ def _thread_heads(
         latest = messages[0]
         unread = any("\\Seen" not in (m.flags or []) for m in messages)
         flagged = any("\\Flagged" in (m.flags or []) for m in messages)
-        snippet = (latest.body_text or html_to_text(latest.body_html) or "")[:180]
+        snippet = collapse_preview(latest.body_text or html_to_text(latest.body_html) or "")[:180]
         heads.append(
             ThreadHead(
                 id=thread.id,
@@ -339,6 +418,8 @@ def _thread_heads(
                 account_id=latest.account_id,
                 folder_canonical=folder,
                 provider="",
+                message_count=max(count_map.get(thread.id, len(messages)), 1),
+                latest_message_id=latest.id,
             )
         )
     providers = _provider_map(db, [h.account_id for h in heads])
@@ -477,11 +558,55 @@ def trash_message(
     account = db.get(MailAccount, msg.account_id)
     if account is None or account.owner_user_id != user.id:
         raise HTTPException(status_code=403, detail="forbidden")
-    source = msg.folder_canonical
-    msg.folder_canonical = "trash"
-    msg.pending_imap = f"trash:{source}"
+    park_message(db, msg, "trash")
     db.commit()
     return {"ok": True}
+
+
+@router.post("/mail/inbox/unimportant/clear")
+def clear_unimportant_inbox(
+    folder: str = Query(default="inbox"),
+    account_id: uuid.UUID | None = Query(default=None),
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Move every inbox message from an unimportant From-domain into trash."""
+    canonical = folder
+    acc = account_id
+    if ":" in folder and account_id is None:
+        prefix, canonical = folder.split(":", 1)
+        try:
+            acc = uuid.UUID(prefix)
+        except ValueError:
+            canonical = folder
+            acc = None
+    if canonical != "inbox":
+        raise HTTPException(status_code=400, detail="inbox_only")
+    row = db.get(User, user.id)
+    if row is None:
+        raise HTTPException(status_code=401, detail="unauthorized")
+    domains = set(_stored_domains(row))
+    if not domains:
+        return {"ok": True, "trashed": 0}
+    stmt = (
+        select(MailMessage)
+        .join(MailAccount, MailMessage.account_id == MailAccount.id)
+        .where(
+            MailAccount.owner_user_id == user.id,
+            MailAccount.is_active.is_(True),
+            MailMessage.folder_canonical == "inbox",
+        )
+    )
+    if acc is not None:
+        stmt = stmt.where(MailMessage.account_id == acc)
+    n = 0
+    for msg in list(db.scalars(stmt)):
+        if normalize_sender_domain(msg.from_addr) not in domains:
+            continue
+        if park_message(db, msg, "trash"):
+            n += 1
+    db.commit()
+    return {"ok": True, "trashed": n}
 
 
 @router.post("/mail/messages/{message_id}/archive")
@@ -496,11 +621,45 @@ def archive_message(
     account = db.get(MailAccount, msg.account_id)
     if account is None or account.owner_user_id != user.id:
         raise HTTPException(status_code=403, detail="forbidden")
-    source = msg.folder_canonical
-    msg.folder_canonical = "archive"
-    msg.pending_imap = f"archive:{source}"
+    n = park_thread(db, msg.thread_id, "archive", user.id)
     db.commit()
-    return {"ok": True}
+    return {"ok": True, "archived": n}
+
+
+@router.post("/mail/messages/{message_id}/done")
+def mark_done(
+    message_id: uuid.UUID,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """TEMPORARY: forward the invoked message to DONE_RECIPIENT, then archive the whole thread."""
+    msg = db.scalars(
+        select(MailMessage)
+        .options(selectinload(MailMessage.attachments))
+        .where(MailMessage.id == message_id)
+    ).first()
+    if msg is None:
+        raise HTTPException(status_code=404, detail="message_not_found")
+    account = db.get(MailAccount, msg.account_id)
+    if account is None or account.owner_user_id != user.id:
+        raise HTTPException(status_code=403, detail="forbidden")
+    if not account.is_active:
+        raise HTTPException(status_code=404, detail="account_not_found")
+    row = MailOutbox(
+        account_id=account.id,
+        owner_user_id=user.id,
+        to_json=[DONE_RECIPIENT],
+        cc_json=[],
+        subject=done_subject(msg.subject),
+        body_html=build_done_html(msg, list(msg.attachments)),
+        in_reply_to_header=normalize_message_id(msg.message_id_header),
+        references_header=msg.references_header or "",
+        status="pending",
+    )
+    db.add(row)
+    n = park_thread(db, msg.thread_id, "archive", user.id)
+    db.commit()
+    return {"ok": True, "to": DONE_RECIPIENT, "outbox_id": str(row.id), "archived": n}
 
 
 @router.post("/mail/folders/trash/empty")
@@ -612,6 +771,7 @@ def compose(
 def download_attachment(
     attachment_id: uuid.UUID,
     as_user_id: uuid.UUID | None = Query(default=None),
+    download: bool = Query(default=False),
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
@@ -631,4 +791,9 @@ def download_attachment(
         raise HTTPException(status_code=404, detail="attachment_not_found")
     if not path.is_file():
         raise HTTPException(status_code=404, detail="attachment_missing")
-    return FileResponse(path, filename=att.filename, media_type=att.mime)
+    return FileResponse(
+        path,
+        media_type=att.mime or "application/octet-stream",
+        filename=att.filename if download else None,
+        content_disposition_type="attachment" if download else "inline",
+    )
